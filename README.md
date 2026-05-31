@@ -7,7 +7,8 @@ Human vs AI boxing game for **Machine Learning Lab** (Assignment 04). A DQN agen
 ```
 Robot Game/
 ├── api/
-│   └── predict.py             # Vercel serverless — POST /api/predict
+│   └── predict/
+│       └── index.py           # Vercel serverless — POST /api/predict
 ├── rl/
 │   ├── robot_boxing_env.py    # RobotBoxing-v1 environment
 │   ├── dqn.py                 # DQN network & agent
