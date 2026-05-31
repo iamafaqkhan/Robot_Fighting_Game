@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Boxing — Human vs DQN AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0e17;
+      --panel: #121a2b;
+      --accent: #00e5ff;
+      --danger: #ff3d5a;
+      --warn: #ffc107;
+      --human: #4fc3f7;
+      --robot: #ff7043;
+      --text: #e8eef7;
+      --muted: #8b9bb4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(ellipse at top, #152238 0%, var(--bg) 55%);
+      color: var(--text);
+      font-family: "Rajdhani", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.25rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-family: "Orbitron", sans-serif;
+      font-weight: 900;
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(90deg, var(--human), var(--accent), var(--robot));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      margin-top: 0.35rem;
+    }
+
+    .hud {
+      width: min(920px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .fighter-hud {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .fighter-hud.human { border-left: 4px solid var(--human); }
+    .fighter-hud.robot { border-right: 4px solid var(--robot); text-align: right; }
+
+    .fighter-hud h2 {
+      font-family: "Orbitron", sans-serif;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5rem;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.2rem;
+    }
+
+    .bar-track {
+      height: 14px;
+      background: rgba(0, 0, 0, 0.45);
+      border-radius: 7px;
+      overflow: hidden;
+      margin-bottom: 0.45rem;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 7px;
+      transition: width 0.15s ease-out;
+    }
+
+    .bar-fill.health { background: linear-gradient(90deg, #c62828, #ef5350); }
+    .bar-fill.stamina { background: linear-gradient(90deg, #1565c0, #42a5f5); }
+
+    .arena-wrap {
+      position: relative;
+      width: min(920px, 100%);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 229, 255, 0.15);
+    }
+
+    #gameCanvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      background: #1a1208;
+    }
+
+    .controls-hint {
+      width: min(920px, 100%);
+      margin-top: 0.75rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .controls-hint kbd {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      font-family: inherit;
+      color: var(--text);
+    }
+
+    #connectionStatus {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    #connectionStatus.connected { color: #69f0ae; border-color: #69f0ae55; }
+    #connectionStatus.disconnected { color: var(--danger); border-color: #ff3d5a55; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(6, 10, 18, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 10;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .overlay.hidden { display: none; }
+
+    .overlay h2 {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(1.5rem, 5vw, 2.4rem);
+      margin-bottom: 0.75rem;
+    }
+
+    .overlay p {
+      color: var(--muted);
+      max-width: 420px;
+      margin-bottom: 1.5rem;
+      font-size: 1.1rem;
+    }
+
+    .btn {
+      font-family: "Orbitron", sans-serif;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.85rem 2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: transform 0.12s, box-shadow 0.12s;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #0091ea);
+      color: #001018;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(0, 229, 255, 0.45);
+    }
+
+    .overlay.victory h2 { color: #69f0ae; }
+    .overlay.defeat h2 { color: var(--danger); }
+    .score-line {
+      font-family: "Orbitron", sans-serif;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      color: var(--warn);
+    }
+  </style>
+</head>
+<body>
+  <div id="connectionStatus" class="disconnected">Connecting…</div>
+
+  <header>
+    <h1>Robot Boxing</h1>
+    <p>Reinforcement Learning Lab — Human vs DQN Agent</p>
+  </header>
+
+  <div class="hud">
+    <div class="fighter-hud human">
+      <h2>YOU — Human Boxer</h2>
+      <div class="bar-label"><span>Health</span><span id="playerHealthText">100</span></div>
+      <div class="bar-track"><div id="playerHealthBar" class="bar-fill health" style="width:100%"></div></div>
+      <div class="bar-label"><span>Stamina</span><span id="playerStaminaText">100</span></div>
+      <div class="bar-track"><div id="playerStaminaBar" class="bar-fill stamina" style="width:100%"></div></div>
+    </div>
+    <div class="fighter-hud robot">
+      <h2>AI — Robot Boxer</h2>
+      <div class="bar-label"><span id="aiHealthText">100</span><span>Health</span></div>
+      <div class="bar-track"><div id="aiHealthBar" class="bar-fill health" style="width:100%"></div></div>
+      <div class="bar-label"><span id="aiStaminaText">100</span><span>Stamina</span></div>
+      <div class="bar-track"><div id="aiStaminaBar" class="bar-fill stamina" style="width:100%"></div></div>
+    </div>
+  </div>
+
+  <div class="arena-wrap">
+    <canvas id="gameCanvas" width="920" height="480"></canvas>
+
+    <div id="menuOverlay" class="overlay">
+      <h2>Ready to Fight?</h2>
+      <p>Face a DQN-trained robot boxer in real time. Land punches, block incoming attacks, and manage your stamina to win.</p>
+      <button id="startBtn" class="btn btn-primary">Start Match</button>
+    </div>
+
+    <div id="endOverlay" class="overlay hidden">
+      <h2 id="endTitle">Victory!</h2>
+      <p id="endMessage">You knocked out the robot.</p>
+      <p class="score-line" id="scoreLine">Score: 0 — 0</p>
+      <button id="restartBtn" class="btn btn-primary">Restart</button>
+    </div>
+  </div>
+
+  <p class="controls-hint">
+    <kbd>A</kbd> / <kbd>←</kbd> Move left &nbsp;·&nbsp;
+    <kbd>D</kbd> / <kbd>→</kbd> Move right &nbsp;·&nbsp;
+    <kbd>Space</kbd> Jab &nbsp;·&nbsp;
+    <kbd>S</kbd> / <kbd>↓</kbd> Block
+  </p>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
