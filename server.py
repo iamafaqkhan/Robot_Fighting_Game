@@ -1,7 +1,7 @@
 """
 Local development server.
 
-Production on Vercel uses root app.py. Locally:
+Production on Vercel uses api/predict.py. Locally:
 
     python server.py
     open http://localhost:8000
@@ -12,12 +12,16 @@ from __future__ import annotations
 from pathlib import Path
 
 import uvicorn
+from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from app import app
+from api.predict import app as predict_app
 from rl.inference import get_agent
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+
+app = FastAPI(title="Robot Boxing (local)")
+app.mount("/api/predict", predict_app)
 
 
 @app.on_event("startup")

@@ -5,4 +5,4 @@ requires-python = ">=3.12"
 description = "Robot Boxing — DQN human vs AI game"
 
 [tool.vercel]
-entrypoint = "app:app"
+entrypoint = "api.predict:app"
