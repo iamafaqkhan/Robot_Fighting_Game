@@ -2,12 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "builds": [
-    { "src": "api/index.py", "use": "@vercel/python" }
+    { "src": "api/index.py", "use": "@vercel/python" },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "app.js", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/predict", "dest": "api/index.py" },
-    { "src": "/app.js", "dest": "/app.js" },
-    { "src": "/training_performance.png", "dest": "/training_performance.png" },
-    { "src": "/", "dest": "/index.html" }
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
