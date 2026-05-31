@@ -24,8 +24,58 @@ const ACTION_NAMES = ["step_left", "step_right", "jab", "block", "dodge"];
 const ACTION_INDEX = Object.fromEntries(ACTION_NAMES.map((n, i) => [n, i]));
 
 const PREDICT_URL = "/api/predict";
+const API_WARM_TIMEOUT_MS = 20000;
+const API_PREDICT_TIMEOUT_MS = 12000;
 
-// --- DOM ---
+let apiReady = false;
+let warmingApi = false;
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function setApiStatus(text, connected) {
+  connectionStatus.textContent = text;
+  connectionStatus.className = connected ? "connected" : "disconnected";
+}
+
+async function warmUpApi(maxAttempts = 4) {
+  if (apiReady || warmingApi) return apiReady;
+  warmingApi = true;
+  setApiStatus("Warming AI…", false);
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      setApiStatus(`Connecting AI (${attempt}/${maxAttempts})…`, false);
+      const res = await fetchWithTimeout(
+        PREDICT_URL,
+        { method: "GET", cache: "no-store" },
+        API_WARM_TIMEOUT_MS
+      );
+      if (res.ok) {
+        apiReady = true;
+        setApiStatus("AI Ready", true);
+        warmingApi = false;
+        return true;
+      }
+    } catch {
+      /* retry — serverless cold start */
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
+
+  warmingApi = false;
+  setApiStatus("AI Slow — retrying in game", false);
+  return false;
+}
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const menuOverlay = document.getElementById("menuOverlay");
@@ -93,8 +143,8 @@ window.addEventListener("keyup", (e) => {
   if (e.code === "ArrowDown" || e.code === "KeyS") keys.block = false;
 });
 
-document.getElementById("startBtn").addEventListener("click", startMatch);
-document.getElementById("restartBtn").addEventListener("click", startMatch);
+document.getElementById("startBtn").addEventListener("click", () => startMatch());
+document.getElementById("restartBtn").addEventListener("click", () => startMatch());
 
 function getPlayerActionFromInput() {
   if (keys.jab) return "jab";
@@ -126,10 +176,14 @@ function resetGame() {
   }
 }
 
-function startMatch() {
+async function startMatch() {
   resetGame();
   menuOverlay.classList.add("hidden");
   endOverlay.classList.add("hidden");
+
+  setApiStatus("Loading AI…", false);
+  await warmUpApi(5);
+
   game.running = true;
   showFlash("FIGHT!");
 }
@@ -282,37 +336,34 @@ async function requestAiPrediction() {
     if (game.waitingAi && game.running) {
       handleAiResponse({ action: "step_left" });
     }
-  }, 2500);
+  }, API_PREDICT_TIMEOUT_MS);
 
   try {
-    const response = await fetch(PREDICT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-      keepalive: true,
-    });
+    const response = await fetchWithTimeout(
+      PREDICT_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      },
+      API_PREDICT_TIMEOUT_MS
+    );
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
+    apiReady = true;
+    setApiStatus("AI Ready", true);
     handleAiResponse(data);
   } catch {
-    connectionStatus.textContent = "API Slow / Offline";
-    connectionStatus.className = "disconnected";
+    setApiStatus("AI Slow — retrying…", false);
     handleAiResponse({ action: "step_left" });
   }
 }
 
 async function checkApiHealth() {
-  try {
-    const res = await fetch(PREDICT_URL, { method: "GET" });
-    if (!res.ok) throw new Error("unavailable");
-    connectionStatus.textContent = "AI Ready";
-    connectionStatus.className = "connected";
-  } catch {
-    connectionStatus.textContent = "API Warming Up…";
-    connectionStatus.className = "disconnected";
-  }
+  await warmUpApi(3);
 }
 
 // --- HUD ---

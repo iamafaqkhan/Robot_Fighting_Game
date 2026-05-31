@@ -94,6 +94,12 @@ def train(
 
     agent.save(str(model_path))
     print(f"\nSaved model weights -> {model_path}")
+
+    from rl.inference import export_numpy_weights
+
+    npz_path = export_numpy_weights(model_path, model_path.with_suffix(".npz"))
+    print(f"Saved NumPy weights -> {npz_path}")
+
     print(f"Training finished in {elapsed:.1f}s")
 
     _save_reward_plot(episode_rewards, plot_path)
