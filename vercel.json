@@ -1,13 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/**/*.py": {
+    "app.py": {
       "memory": 1024,
       "maxDuration": 10,
       "includeFiles": "robot_boxer.pt"
     }
-  },
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" }
-  ]
+  }
 }
