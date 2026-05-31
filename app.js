@@ -1,7 +1,8 @@
 /**
- * Layer 3 — Robot Boxing web client (Canvas + Socket.IO)
+ * Layer 3 — Robot Boxing web client (Canvas + HTTP inference)
  *
  * Mirrors rl/robot_boxing_env.py combat rules so live play matches training.
+ * Calls POST /api/predict (Vercel serverless) instead of WebSockets.
  */
 
 // --- Combat constants (synced with robot_boxing_env.py) ---
@@ -22,9 +23,7 @@ const STAMINA_RECOVERY = 4;
 const ACTION_NAMES = ["step_left", "step_right", "jab", "block", "dodge"];
 const ACTION_INDEX = Object.fromEntries(ACTION_NAMES.map((n, i) => [n, i]));
 
-const SERVER_URL = window.location.origin.includes("file:")
-  ? "http://localhost:8000"
-  : window.location.origin;
+const PREDICT_URL = "/api/predict";
 
 // --- DOM ---
 const canvas = document.getElementById("gameCanvas");
@@ -47,24 +46,6 @@ const hud = {
   aiStaminaText: document.getElementById("aiStaminaText"),
 };
 
-// --- Socket ---
-const socket = io(SERVER_URL, { transports: ["websocket", "polling"] });
-
-socket.on("connect", () => {
-  connectionStatus.textContent = "AI Connected";
-  connectionStatus.className = "connected";
-});
-
-socket.on("disconnect", () => {
-  connectionStatus.textContent = "Disconnected";
-  connectionStatus.className = "disconnected";
-});
-
-socket.on("connect_error", () => {
-  connectionStatus.textContent = "Server Offline";
-  connectionStatus.className = "disconnected";
-});
-
 // --- Game state ---
 const game = {
   running: false,
@@ -79,7 +60,7 @@ const game = {
   playerHits: 0,
   aiHits: 0,
   frameCount: 0,
-  tickInterval: 10,
+  tickInterval: 12,
   animTimer: 0,
   flashText: "",
   flashTimer: 0,
@@ -261,13 +242,9 @@ function resolveTurn(playerAction, aiAction) {
   else if (game.playerHealth <= 0) endMatch(false);
 }
 
-function emitGameTick() {
-  if (!game.running || game.waitingAi) return;
-
+function buildPredictPayload() {
   game.playerAction = getPlayerActionFromInput();
-  game.waitingAi = true;
-
-  socket.emit("game_tick", {
+  return {
     player_x: game.playerX,
     ai_x: game.aiX,
     player_health: game.playerHealth,
@@ -275,18 +252,10 @@ function emitGameTick() {
     player_stamina: game.playerStamina,
     ai_stamina: game.aiStamina,
     player_action: game.playerAction,
-  });
-
-  if (game.aiTimeoutId) clearTimeout(game.aiTimeoutId);
-  game.aiTimeoutId = setTimeout(() => {
-    if (game.waitingAi && game.running) {
-      resolveTurn(getPlayerActionFromInput(), "step_left");
-      game.waitingAi = false;
-    }
-  }, 800);
+  };
 }
 
-socket.on("ai_response", (data) => {
+function handleAiResponse(data) {
   if (game.aiTimeoutId) {
     clearTimeout(game.aiTimeoutId);
     game.aiTimeoutId = null;
@@ -296,11 +265,55 @@ socket.on("ai_response", (data) => {
     return;
   }
 
-  const aiAction = ACTION_NAMES.includes(data.action) ? data.action : "step_left";
-  const playerAction = getPlayerActionFromInput();
-  resolveTurn(playerAction, aiAction);
+  const aiAction =
+    data && ACTION_NAMES.includes(data.action) ? data.action : "step_left";
+  resolveTurn(getPlayerActionFromInput(), aiAction);
   game.waitingAi = false;
-});
+}
+
+async function requestAiPrediction() {
+  if (!game.running || game.waitingAi) return;
+
+  game.waitingAi = true;
+  const payload = buildPredictPayload();
+
+  if (game.aiTimeoutId) clearTimeout(game.aiTimeoutId);
+  game.aiTimeoutId = setTimeout(() => {
+    if (game.waitingAi && game.running) {
+      handleAiResponse({ action: "step_left" });
+    }
+  }, 2500);
+
+  try {
+    const response = await fetch(PREDICT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const data = await response.json();
+    handleAiResponse(data);
+  } catch {
+    connectionStatus.textContent = "API Slow / Offline";
+    connectionStatus.className = "disconnected";
+    handleAiResponse({ action: "step_left" });
+  }
+}
+
+async function checkApiHealth() {
+  try {
+    const res = await fetch(PREDICT_URL, { method: "GET" });
+    if (!res.ok) throw new Error("unavailable");
+    connectionStatus.textContent = "AI Ready";
+    connectionStatus.className = "connected";
+  } catch {
+    connectionStatus.textContent = "API Warming Up…";
+    connectionStatus.className = "disconnected";
+  }
+}
 
 // --- HUD ---
 function updateHud() {
@@ -483,7 +496,7 @@ function gameLoop() {
 
   if (game.running) {
     if (game.frameCount % game.tickInterval === 0) {
-      emitGameTick();
+      requestAiPrediction();
     }
   }
 
@@ -492,4 +505,5 @@ function gameLoop() {
 }
 
 updateHud();
+checkApiHealth();
 requestAnimationFrame(gameLoop);

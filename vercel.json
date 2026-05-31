@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "name": "robot-boxing-game",
+  "functions": {
+    "api/predict.py": {
+      "memory": 1024,
+      "maxDuration": 10,
+      "includeFiles": "robot_boxer.pt"
+    }
+  },
+  "routes": [
+    { "src": "/api/predict", "dest": "/api/predict.py" },
+    { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/training_performance.png", "dest": "/training_performance.png" },
+    { "src": "/", "dest": "/index.html" }
+  ]
+}
