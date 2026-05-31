@@ -3,6 +3,3 @@ name = "robot-boxing"
 version = "1.0.0"
 requires-python = ">=3.12"
 description = "Robot Boxing — DQN human vs AI game"
-
-[tool.vercel]
-entrypoint = "api.predict:app"

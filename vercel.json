@@ -1,13 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/predict.py": {
-      "memory": 1024,
-      "maxDuration": 10,
-      "includeFiles": "robot_boxer.pt"
-    }
-  },
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" }
+  "version": 2,
+  "builds": [
+    { "src": "api/index.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/predict", "dest": "api/index.py" },
+    { "src": "/app.js", "dest": "/app.js" },
+    { "src": "/training_performance.png", "dest": "/training_performance.png" },
+    { "src": "/", "dest": "/index.html" }
   ]
 }

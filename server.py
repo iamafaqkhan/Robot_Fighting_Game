@@ -1,7 +1,7 @@
 """
 Local development server.
 
-Production on Vercel uses api/predict.py. Locally:
+Production on Vercel uses api/index.py. Locally:
 
     python server.py
     open http://localhost:8000
@@ -15,7 +15,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 
-from api.predict import app as predict_app
+from api.index import app as predict_app
 from rl.inference import get_agent
 
 PROJECT_ROOT = Path(__file__).resolve().parent

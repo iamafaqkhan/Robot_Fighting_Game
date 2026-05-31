@@ -7,8 +7,8 @@ Human vs AI boxing game for **Machine Learning Lab** (Assignment 04). A DQN agen
 ```
 Robot Game/
 ├── api/
-│   └── predict.py             # Vercel serverless — /api/predict
-├── pyproject.toml             # Declares api.predict:app for Vercel
+│   └── index.py               # Vercel serverless (required filename)
+├── pyproject.toml             # Python version metadata
 ├── rl/
 │   ├── robot_boxing_env.py    # RobotBoxing-v1 environment
 │   ├── dqn.py                 # DQN network & agent
@@ -17,7 +17,7 @@ Robot Game/
 ├── robot_boxer.pt             # Trained weights (commit to Git!)
 ├── training_performance.png   # Reward vs episode (report)
 ├── server.py                  # Local dev (serves HTML + API)
-├── vercel.json                # Function memory / model bundle config
+├── vercel.json                # @vercel/python build + /api/predict route
 ├── index.html                 # Frontend UI
 ├── app.js                     # Canvas game + fetch() sync loop
 ├── requirements.txt           # Vercel (CPU torch + numpy)
